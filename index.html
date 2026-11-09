@@ -19,7 +19,6 @@
 </head>
 <body>
 
-<!-- Loading Screen -->
 <div id="loading-screen">
   <div class="loader-content">
     <div class="loader-logo"></div>
@@ -28,14 +27,12 @@
   </div>
 </div>
 
-<!-- Back to Top -->
 <button id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Retour en haut"></button>
 
 <div id="toast-wrap"></div>
 
 <div id="app">
 
-<!-- ============= PUBLIC SITE ============= -->
 <div class="view active" id="view-site">
 
   <nav class="nav" id="mainNav">
@@ -162,7 +159,6 @@
   <div id="footer-public"></div>
 </div>
 
-<!-- ============= APP (dashboard / admin) ============= -->
 <div class="view" id="view-app">
   <div class="app-shell">
     <div class="sidebar" id="sidebar"></div>
@@ -183,7 +179,6 @@
 
 </div><!-- /#app -->
 
-<!-- ============= AUTH MODAL ============= -->
 <div class="overlay" id="authOverlay" onclick="if(event.target===this)closeAuth()">
   <div class="modal" id="authModal"></div>
 </div>
