@@ -1,9 +1,4 @@
-/* ============================================================\
-  AgroMentor — Script principal (version améliorée)
-   ============================================================ */
-
-/* ---------- Data store ---------- */
-let DB = { users:[], binomes:[], messages:[], notifications:[] };
+ let DB = { users:[], binomes:[], messages:[], notifications:[] };
 let SESSION = null;
 let currentChatWith = null;
 let regStep = 0;
@@ -11,7 +6,6 @@ let regData = { interests:[], activities:[] };
 let registering = false;
 let contactSending = false;
 
-/* ---------- Constants (previously missing) ---------- */
 const INTERESTS = [
   'Agronomie', 'Nutrition', 'Agroalimentaire', 'Productions végétales',
   'Productions animales', 'Développement durable', 'Recherche scientifique',
@@ -38,7 +32,6 @@ async function withAdminLock(fn){
   }
 }
 
-/* ---------- Amélioration de saveDB ---------- */
 function recordId(x){ 
   if(!x) return null;
   // Pour les notifications, utiliser l'id unique
@@ -92,7 +85,6 @@ async function saveDB(key) {
   }
 }
 
-/* ---------- storage helpers ---------- */
 async function loadDB(){
   const savedSession = SESSION;
   for(const key of Object.keys(DB)){
@@ -208,9 +200,6 @@ setInterval(()=>{
 const rotatorEl = document.getElementById('rotator');
 if(rotatorEl) rotatorEl.style.transition = 'opacity .3s ease';
 
-/* ============================================================
-   ANIMATED COUNTER
-   ============================================================ */
 function animateCounter(el, target, duration = 1200) {
   if(!el) return;
   // Ne pas relancer l'animation si la valeur affichée est déjà la bonne
@@ -227,9 +216,6 @@ function animateCounter(el, target, duration = 1200) {
   requestAnimationFrame(step);
 }
 
-/* ============================================================
-   GROWTH-RING DIAGRAM
-   ============================================================ */
 function renderRings(active){
   const svg = `
   <svg viewBox="0 0 400 400" width="100%" height="100%">
@@ -256,9 +242,6 @@ document.querySelectorAll('.step-item').forEach(item=>{
   });
 });
 
-/* ============================================================
-   FAQ
-   ============================================================ */
 const FAQS = [
   ["Qui peut s'inscrire surAgroMentor ?","La plateforme est exclusivement réservée aux étudiants du département STAAN, parrains comme filleuls."],
   ["Comment est choisi mon binôme ?","Un algorithme de compatibilité propose un binôme selon vos centres d'intérêt, disponibilités et objectifs. La proposition est ensuite validée, modifiée ou refusée par l'administrateur."],
@@ -277,9 +260,6 @@ if(faqListEl){
 function toggleFaq(i){ document.getElementById('faq'+i)?.classList.toggle('open'); }
 
 
-/* ============================================================
-   FOOTER
-   ============================================================ */
 function footerHTML(){
   return `
   <footer>
@@ -371,9 +351,6 @@ window.addEventListener('scroll', ()=>{
   if(backToTopBtn) backToTopBtn.classList.toggle('visible', window.scrollY > 400);
 }, { passive: true });
 
-/* ============================================================
-   AUTH — login / register
-   ============================================================ */
 function openAuth(mode){
   document.getElementById('authOverlay').classList.add('show');
   if(mode==='login') renderLogin();
@@ -636,7 +613,6 @@ async function finishRegister(){
   }
 }
 
-/* ---------- compatibility score: normalized to exactly 100 points ---------- */
 const COMPATIBILITY_WEIGHTS = Object.freeze({
   interests: 15,
   activities: 10,
@@ -779,9 +755,6 @@ async function tryAutoMatch(user){
   await notify(ADMIN_EMAIL, "Nouvelle proposition de binôme en attente de validation.");
 }
 
-/* ============================================================
-   ENTER APP / ROUTER
-   ============================================================ */
 function enterApp(){
   document.getElementById('view-site').classList.remove('active');
   document.getElementById('view-app').classList.add('active');
@@ -846,7 +819,6 @@ function goto(view){
   (renderers[view]||renderDashboard)();
 }
 
-/* ---------- USER: dashboard overview ---------- */
 function myBinome(){
   const u=me();
   return DB.binomes.find(b=> (b.parrainEmail===u.email||b.filleulEmail===u.email) && b.status==='validé');
@@ -901,7 +873,6 @@ function renderBinomeUser(){
   document.getElementById('appContent').innerHTML = `<div class="panel"><h3>Mon binôme</h3>${binomeSummaryHTML(u)}</div>`;
 }
 
-/* ---------- USER: profile ---------- */
 function renderProfile(){
   const u=me();
   document.getElementById('appContent').innerHTML = `
@@ -993,7 +964,6 @@ async function removeUserCascade(email){
   await saveKey('notifications');
 }
 
-/* ---------- USER: messages ---------- */
 function conversationsFor(email){
   const partners = new Set();
   DB.messages.forEach(m=>{ if(m.from===email) partners.add(m.to); if(m.to===email) partners.add(m.from); });
@@ -1056,9 +1026,6 @@ async function renderNotifications(){
   await saveKey('notifications');
 }
 
-/* ============================================================
-   ADMIN VIEWS
-   ============================================================ */
 function renderAdminOverview(){
   const nbParrains = DB.users.filter(u=>u.role==='parrain').length;
   const nbFilleuls = DB.users.filter(u=>u.role==='filleul').length;
@@ -1272,7 +1239,6 @@ async function deleteBinome(id){
   });
 }
 
-/* ---------- ADMIN: notifications ---------- */
 function renderAdminNotifications(){
   const list = [...DB.notifications].sort((a,b)=>b.ts-a.ts);
   const unread = list.filter(n=>!n.read).length;
@@ -1303,9 +1269,6 @@ async function markAllNotificationsRead(){
   renderAdminNotifications();
 }
 
-/* ============================================================
-   SHOWCASE (public sponsors/sponsees preview)
-   ============================================================ */
 function renderShowcase(){
   const sponsors = DB.users.filter(u=>u.role==='parrain' && u.status==='actif').slice(0,3);
   const sponsees = DB.users.filter(u=>u.role==='filleul' && u.status==='actif').slice(0,3);
@@ -1319,9 +1282,6 @@ function renderShowcase(){
   document.querySelectorAll('.reveal:not(.revealed)').forEach(el=>revealObserver.observe(el));
 }
 
-/* ============================================================
-   SYNC
-   ============================================================ */
 async function syncOnlineData() {
   try {
     toast("Mise à jour des données depuis le Cloud...","Synchronisation");
@@ -1381,9 +1341,6 @@ function stopAutoRefresh(){
   }
 }
 
-/* ============================================================
-   DEBUG: fonction de diagnostic accessible depuis la console
-   ============================================================ */
 window.debugAgroMentor = async function(){
   console.log('=== DIAGNOSTIC AGROMENTOR ===');
   console.log('DB complet:', JSON.parse(JSON.stringify(DB)));
@@ -1401,9 +1358,6 @@ window.debugAgroMentor = async function(){
   console.log('=== FIN DIAGNOSTIC ===');
 };
 
-/* ============================================================
-   INIT
-   ============================================================ */
 (async function init(){
   await loadDB();
   const actifs = DB.binomes.filter(b=>b.status==='validé').length;
