@@ -1,6 +1,3 @@
-/* ============================================================\
-   Shim de compatibilité AgroMentor — Version Synchronisée Cloud
-   ============================================================ */
 (function () {
   window.storage = {
     async get(key) {
