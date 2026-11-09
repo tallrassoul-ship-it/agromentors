@@ -65,18 +65,15 @@ button{font-family:inherit;cursor:pointer;}
 #backToTop.visible{opacity:1;transform:translateY(0);pointer-events:auto;}
 #backToTop:hover{background:var(--cobalt);color:var(--noir);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,71,171,.5);}
 
-/* ---------- App shell / routing ---------- */
 #app{min-height:100vh;display:flex;flex-direction:column;}
 .view{display:none;flex:1;}
 .view.active{display:block;}
 
-/* ---------- Scroll Reveal Animations ---------- */
 .reveal{opacity:0;transform:translateY(30px);transition:opacity .7s ease, transform .7s ease;}
 .reveal.revealed{opacity:1;transform:translateY(0);}
 .reveal-delay-1{transition-delay:.15s;}
 .reveal-delay-2{transition-delay:.3s;}
 
-/* ---------- Nav ---------- */
 .nav{
   position:sticky;top:0;z-index:50;
   background:rgba(240,242,245,.92);
@@ -139,7 +136,6 @@ button{font-family:inherit;cursor:pointer;}
 .btn-danger:hover{background:#8e1c1c;}
 .btn-block{width:100%;justify-content:center;}
 
-/* ---------- Hero ---------- */
 .hero{
   position:relative;overflow:hidden;
   padding:72px 0 52px;
@@ -182,7 +178,6 @@ button{font-family:inherit;cursor:pointer;}
 .hero-shape-2{width:200px;height:200px;bottom:-60px;left:-60px;background:radial-gradient(circle,rgba(0,51,128,.12),transparent 70%);animation:float 10s ease-in-out infinite reverse;}
 @keyframes float{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-20px) rotate(5deg);}}
 
-/* ---------- Section generic ---------- */
 section{padding:82px 0;}
 .section-head{max-width:640px;margin:0 0 44px;}
 .section-head .eyebrow{margin-bottom:14px;}
@@ -190,7 +185,6 @@ section{padding:82px 0;}
 .section-head p{color:var(--ink-soft);font-size:15.5px;line-height:1.6;margin:0;}
 .alt{background:var(--paper);}
 
-/* ---------- How it works — growth rings ---------- */
 .steps-wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:50px;align-items:center;}
 .rings{position:relative;width:100%;aspect-ratio:1/1;max-width:400px;margin:0 auto;}
 .steps-list{display:flex;flex-direction:column;gap:0;}
@@ -213,7 +207,6 @@ section{padding:82px 0;}
   font-size:13.8px;color:var(--noir);display:flex;gap:12px;box-shadow:0 2px 8px rgba(0,71,171,.2);
 }
 
-/* ---------- Cards grid ---------- */
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
 .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;}
 .card{
@@ -255,7 +248,6 @@ section{padding:82px 0;}
 .people-card span{font-size:12.5px;color:var(--ink-soft);}
 .tag{display:inline-block;background:var(--cobalt-soft);color:var(--cobalt);font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;margin:10px 3px 0;border:1px solid var(--cobalt-light);}
 
-/* ---------- FAQ ---------- */
 .faq-item{border-bottom:1px solid var(--line);padding:18px 0;transition:var(--transition);}
 .faq-item:hover{padding-left:6px;}
 .faq-q{display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:var(--noir);font-size:15.5px;transition:color .2s;}
@@ -265,7 +257,6 @@ section{padding:82px 0;}
 .faq-item.open .faq-q .chev{transform:rotate(45deg);}
 .chev{transition:.2s;font-size:20px;color:var(--cobalt);}
 
-/* ---------- Forms ---------- */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 label{font-size:12.8px;font-weight:600;color:var(--noir);display:block;margin-bottom:6px;}
 input,select,textarea{
@@ -300,7 +291,6 @@ footer::before{
 .credit{font-size:12.8px;color:#CFE0D6;font-weight:500;text-align:right;}
 .credit b{color:var(--cobalt-light);}
 
-/* ---------- Modal ---------- */
 .overlay{
   position:fixed;inset:0;background:rgba(10,10,10,.7);backdrop-filter:blur(4px);
   display:none;align-items:flex-start;justify-content:center;z-index:200;padding:40px 16px;overflow:auto;
@@ -322,7 +312,6 @@ footer::before{
 .step-track div{flex:1;height:4px;border-radius:99px;background:var(--line);transition:background .3s;}
 .step-track div.done{background:var(--cobalt);}
 
-/* ---------- Toast ---------- */
 #toast-wrap{position:fixed;bottom:22px;right:22px;z-index:400;display:flex;flex-direction:column;gap:10px;}
 .toast{
   background:var(--noir);color:#fff;padding:13px 18px;border-radius:12px;font-size:13.8px;
@@ -333,7 +322,6 @@ footer::before{
 @keyframes slideIn{from{transform:translateX(40px);opacity:0;}to{transform:translateX(0);opacity:1;}}
 .toast b{color:var(--cobalt-light);}
 
-/* ---------- App (dashboard/admin) shell ---------- */
 .app-shell{display:flex;min-height:100vh;}
 .sidebar{
   width:250px;flex:none;background:var(--noir);color:#EAF1EC;padding:22px 16px;display:flex;flex-direction:column;
@@ -410,7 +398,6 @@ tr:hover{background:var(--cobalt-soft);}
 .notif-dot{width:8px;height:8px;border-radius:50%;background:var(--cobalt-light);flex:none;margin-top:6px;transition:background .2s;box-shadow:0 0 6px var(--cobalt-light);}
 .notif-item.read .notif-dot{background:var(--line);box-shadow:none;}
 
-/* ---------- Responsive ---------- */
 @media(max-width:900px){
   .hero-grid,.steps-wrap,.grid-3,.grid-2,.foot-grid{grid-template-columns:1fr;}
   .nav-inner{position:relative;flex-wrap:nowrap;}
@@ -441,7 +428,6 @@ tr:hover{background:var(--cobalt-soft);}
   section{padding:60px 0;}
 }
 
-/* ---------- Small phones ---------- */
 @media(max-width:560px){
   .container{padding:0 18px;}
   .nav-inner{padding:12px 18px;}
@@ -474,7 +460,6 @@ tr:hover{background:var(--cobalt-soft);}
     #backToTop{bottom:18px;right:18px;width:40px;height:40px;font-size:17px;}
 }
 
-/* ---------- Print styles ---------- */
 @media print{
   .nav,.hamburger,#backToTop,#toast-wrap,.overlay,.sidebar,.topbar{display:none !important;}
   .hero-shape{display:none;}
