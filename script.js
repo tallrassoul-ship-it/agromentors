@@ -721,6 +721,16 @@ function getBinomeCompatibility(binome){
 }
 
 async function tryAutoMatch(user){
+  // Vérifier si l'utilisateur a déjà un binôme actif (proposé ou validé)
+  const hasActiveBinome = DB.binomes.some(b => 
+    (b.parrainEmail === user.email || b.filleulEmail === user.email) && 
+    (b.status === 'validé' || b.status === 'proposé')
+  );
+  if(hasActiveBinome){
+    console.log('⏸️', user.email, 'a déjà un binôme actif, pas de nouveau match');
+    return;
+  }
+  
   const oppRole = user.role==='parrain' ? 'filleul' : 'parrain';
   const candidates = DB.users.filter(candidate=>
     candidate.role === oppRole &&
@@ -1205,10 +1215,39 @@ async function setBinomeStatus(id,status){
   await withAdminLock(async () => {
     const b=DB.binomes.find(x=>x.id===id);
     if(!b){ toast("Binôme introuvable (peut-être supprimé)."); renderBinomeTable(); return; }
+    
+    // Mémoriser les emails avant modification
+    const parrainEmail = b.parrainEmail;
+    const filleulEmail = b.filleulEmail;
+    
     b.status=status;
     await saveKey('binomes');
-    await notify(b.parrainEmail, status==='validé'? "Votre binôme a été validé par l'administrateur !" : "Votre proposition de binôme a été refusée.");
-    await notify(b.filleulEmail, status==='validé'? "Votre binôme a été validé par l'administrateur !" : "Votre proposition de binôme a été refusée.");
+    
+    if(status==='validé'){
+      await notify(parrainEmail, "Votre binôme a été validé par l'administrateur !");
+      await notify(filleulEmail, "Votre binôme a été validé par l'administrateur !");
+      toast("Binôme validé !");
+    } else if(status==='refusé'){
+      await notify(parrainEmail, "Votre proposition de binôme a été refusée par l'administrateur. Une nouvelle proposition sera faite.");
+      await notify(filleulEmail, "Votre proposition de binôme a été refusée par l'administrateur. Une nouvelle proposition sera faite.");
+      toast("Binôme refusé. Nouvelle recherche en cours...");
+      
+      // Relancer le matching pour les deux membres du binôme refusé
+      const parrain = findUser(parrainEmail);
+      const filleul = findUser(filleulEmail);
+      
+      if(parrain){
+        console.log('🔄 Nouvelle proposition pour parrain:', parrain.email);
+        await tryAutoMatch(parrain).catch(e => console.warn('Match parrain échoué:', e));
+      }
+      if(filleul){
+        console.log('🔄 Nouvelle proposition pour filleul:', filleul.email);
+        await tryAutoMatch(filleul).catch(e => console.warn('Match filleul échoué:', e));
+      }
+      
+      toast("Nouvelles propositions envoyées !", "Binôme refusé");
+    }
+    
     renderBinomeTable();
     const statEl = document.getElementById('statBinomes');
     if(statEl) statEl.textContent = DB.binomes.filter(x=>x.status==='validé').length;
