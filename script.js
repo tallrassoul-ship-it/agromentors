@@ -957,12 +957,19 @@ function binomeSummaryHTML(u){
       </div>
     </div>`;
   }
-  return `<p style="color:var(--ink-soft);font-size:14px;">Aucune proposition pour le moment. Complétez votre profil pour améliorer votre compatibilité.</p>`;
+  return `<p style="color:var(--ink-soft);font-size:14px;">Aucune proposition pour le moment. L'administrateur vous assignera un binôme compatible.</p>`;
 }
 
 function renderBinomeUser(){
   const u=me();
-  document.getElementById('appContent').innerHTML = `<div class="panel"><h3>Mon binôme</h3>${binomeSummaryHTML(u)}</div>`;
+  if(!u){
+    document.getElementById('appContent').innerHTML = '<div class="panel"><h3>Mon binôme</h3><p>Utilisateur non connecté.</p></div>';
+    return;
+  }
+  
+  // Afficher uniquement le binôme actuel (validé ou proposé)
+  const html = `<div class="panel"><h3>Mon binôme</h3>${binomeSummaryHTML(u)}</div>`;
+  document.getElementById('appContent').innerHTML = html;
 }
 
 function renderProfile(){
@@ -1243,8 +1250,72 @@ function renderAdminBinomes(){
     <div class="panel">
       <h3>Propositions et binômes</h3>
       <div style="overflow:auto;"><table id="binomeTable"></table></div>
+    </div>
+    <div class="panel">
+      <h3>🏆 Top 10 des meilleures compatibilités</h3>
+      <p style="color:var(--ink-soft);font-size:13px;margin-bottom:14px;">Affiche les meilleurs matchs, même pour les utilisateurs ayant déjà une proposition.</p>
+      <div id="topCompatibilities"></div>
     </div>`;
   renderBinomeTable();
+  renderTopCompatibilities();
+}
+
+function renderTopCompatibilities(){
+  const container = document.getElementById('topCompatibilities');
+  if(!container) return;
+  
+  const parrains = DB.users.filter(u => u.role === 'parrain' && u.status === 'actif');
+  const filleuls = DB.users.filter(u => u.role === 'filleul' && u.status === 'actif');
+  
+  if(parrains.length === 0 || filleuls.length === 0){
+    container.innerHTML = '<p style="color:var(--ink-soft);">Pas assez de candidats.</p>';
+    return;
+  }
+  
+  const allMatches = [];
+  parrains.forEach(parrain => {
+    filleuls.forEach(filleul => {
+      const score = calculateCompatibility(parrain, filleul);
+      allMatches.push({
+        parrain: parrain,
+        filleul: filleul,
+        score: score,
+        existingBinome: DB.binomes.find(b => 
+          ((b.parrainEmail === parrain.email && b.filleulEmail === filleul.email) ||
+           (b.parrainEmail === filleul.email && b.filleulEmail === parrain.email))
+        )
+      });
+    });
+  });
+  
+  allMatches.sort((a, b) => b.score - a.score);
+  const top10 = allMatches.slice(0, 10);
+  
+  let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+  top10.forEach((match, index) => {
+    const badge = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+    const existingStatus = match.existingBinome ? match.existingBinome.status : null;
+    const statusBadge = existingStatus === 'validé' ? '<span class="badge ok">Validé</span>' : 
+                       existingStatus === 'proposé' ? '<span class="badge wait">Proposé</span>' : 
+                       '<span class="badge off">Aucun</span>';
+    
+    html += `<div style="display:flex;align-items:center;gap:12px;padding:10px;background:${index < 3 ? 'var(--cobalt-soft)' : 'var(--cream)'};border-radius:8px;border:1px solid var(--line);">
+      <div style="font-size:20px;width:30px;">${badge}</div>
+      <div style="flex:1;">
+        <b>${esc(match.parrain.prenom)} ${esc(match.parrain.nom)}</b>
+        <span style="color:var(--ink-soft);"> ↔ </span>
+        <b>${esc(match.filleul.prenom)} ${esc(match.filleul.nom)}</b>
+        <div style="font-size:11px;color:var(--ink-soft);">${esc(match.parrain.ville||'')} ↔ ${esc(match.filleul.ville||'')}</div>
+      </div>
+      <div style="text-align:right;">
+        <b style="font-size:18px;color:var(--cobalt);">${match.score}%</b>
+        <div>${statusBadge}</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  
+  container.innerHTML = html;
 }
 function renderBinomeTable(){
   const table = document.getElementById('binomeTable');
