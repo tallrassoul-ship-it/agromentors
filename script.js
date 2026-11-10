@@ -723,61 +723,129 @@ function getBinomeCompatibility(binome){
 async function tryAutoMatch(user){
   console.log('🔍 tryAutoMatch pour:', user.email, user.role);
   
-  // Vérifier si l'utilisateur a un binôme VALIDÉ (seul cas bloquant)
-  const hasValidatedBinome = DB.binomes.some(b => 
+  // 1. Bloqué si binôme VALIDÉ
+  const validatedBinome = DB.binomes.find(b => 
     (b.parrainEmail === user.email || b.filleulEmail === user.email) && 
     b.status === 'validé'
   );
-  if(hasValidatedBinome){
-    console.log('⏸️', user.email, 'a déjà un binôme validé, pas de nouveau match');
+  if(validatedBinome){
+    console.log('⏸️', user.email, 'a déjà un binôme validé');
     return;
   }
   
-  const oppRole = user.role==='parrain' ? 'filleul' : 'parrain';
+  // 2. Binôme PROPOSÉ existant (si applicable)
+  const existingProposed = DB.binomes.find(b => 
+    (b.parrainEmail === user.email || b.filleulEmail === user.email) && 
+    b.status === 'proposé'
+  );
+  const existingScore = existingProposed ? (existingProposed.compat || 0) : -1;
+  if(existingProposed){
+    console.log('📊 Score existant pour', user.email, ':', existingScore + '%');
+  }
   
-  // Inclure TOUS les candidats actifs du rôle opposé (sauf ceux avec binôme validé)
-  const candidates = DB.users.filter(candidate=>{
-    if(candidate.role !== oppRole || candidate.status !== 'actif') return false;
-    // Exclure seulement les candidats avec un binôme VALIDÉ
-    const hasValidated = DB.binomes.some(b => 
-      (b.parrainEmail === candidate.email || b.filleulEmail === candidate.email) && 
+  // 3. Trouver tous les candidats (exclure ceux avec binôme VALIDÉ uniquement)
+  const oppRole = user.role === 'parrain' ? 'filleul' : 'parrain';
+  const candidates = DB.users.filter(c => 
+    c.role === oppRole && 
+    c.status === 'actif' &&
+    !DB.binomes.some(b => 
+      (b.parrainEmail === c.email || b.filleulEmail === c.email) && 
       b.status === 'validé'
-    );
-    return !hasValidated;
-  });
+    )
+  );
   
   console.log('👥 Candidats trouvés:', candidates.length);
-  
   if(!candidates.length){
     console.log('❌ Aucun candidat disponible');
     return;
   }
-
+  
+  // 4. Trouver le meilleur candidat
   let best = null;
   let bestScore = -1;
-  candidates.forEach(candidate=>{
+  let bestCandidateProposed = null;
+  
+  for(const candidate of candidates){
     const score = calculateCompatibility(user, candidate);
     if(score > bestScore){
-      best = candidate;
       bestScore = score;
+      best = candidate;
+      // Vérifier si ce candidat a une proposition existante
+      bestCandidateProposed = DB.binomes.find(b => 
+        (b.parrainEmail === candidate.email || b.filleulEmail === candidate.email) && 
+        b.status === 'proposé'
+      );
     }
-  });
+  }
+  
   if(!best) return;
-
+  
+  const newScore = clampPercentage(bestScore);
+  console.log('🏆 Meilleur candidat:', best.email, '- Score:', newScore + '%');
+  
+  // 5. Décision : remplacer ou garder l'existant ?
+  const shouldReplace = newScore > existingScore;
+  const candidateShouldReplace = bestCandidateProposed && newScore > (bestCandidateProposed.compat || 0);
+  
+  if(!shouldReplace && !candidateShouldReplace){
+    console.log('⏸️ Pas de meilleur match trouvé');
+    return;
+  }
+  
+  // 6. Remplacer les anciennes propositions si nécessaire
+  const displacedUsers = [];
+  
+  if(existingProposed && shouldReplace){
+    const ancienPartenaireEmail = existingProposed.parrainEmail === user.email 
+      ? existingProposed.filleulEmail 
+      : existingProposed.parrainEmail;
+    existingProposed.status = 'refusé';
+    displacedUsers.push({email: ancienPartenaireEmail, raison: 'remplacé'});
+    console.log('🔄 Ancienne proposition de', user.email, 'marquée comme refusée');
+  }
+  
+  if(bestCandidateProposed && candidateShouldReplace){
+    const ancienPartenaireEmail = bestCandidateProposed.parrainEmail === best.email 
+      ? bestCandidateProposed.filleulEmail 
+      : bestCandidateProposed.parrainEmail;
+    bestCandidateProposed.status = 'refusé';
+    displacedUsers.push({email: ancienPartenaireEmail, raison: 'remplacé'});
+    console.log('🔄 Ancienne proposition de', best.email, 'marquée comme refusée');
+  }
+  
+  await saveKey('binomes');
+  
+  // 7. Créer le nouveau binôme
   const binome = {
     id: uid(),
-    parrainEmail: user.role==='parrain' ? user.email : best.email,
-    filleulEmail: user.role==='filleul' ? user.email : best.email,
+    parrainEmail: user.role === 'parrain' ? user.email : best.email,
+    filleulEmail: user.role === 'filleul' ? user.email : best.email,
     status: 'proposé',
-    compat: clampPercentage(bestScore),
+    compat: newScore,
     createdAt: Date.now()
   };
+  
+  console.log('✅ Nouvelle proposition:', binome.parrainEmail, '↔', binome.filleulEmail, '-', newScore + '%');
+  
   DB.binomes.push(binome);
   await saveKey('binomes');
-  await notify(binome.parrainEmail, "Un binôme vous a été proposé automatiquement, en attente de validation.");
-  await notify(binome.filleulEmail, "Un binôme vous a été proposé automatiquement, en attente de validation.");
-  await notify(ADMIN_EMAIL, "Nouvelle proposition de binôme en attente de validation.");
+  
+  // 8. Notifications
+  await notify(binome.parrainEmail, "Un binôme vous a été proposé automatiquement, en attente de validation.").catch(e => console.warn('Notification parrain échouée:', e));
+  await notify(binome.filleulEmail, "Un binôme vous a été proposé automatiquement, en attente de validation.").catch(e => console.warn('Notification filleul échouée:', e));
+  await notify(ADMIN_EMAIL, "Nouvelle proposition de binôme en attente de validation.").catch(e => console.warn('Notification admin échouée:', e));
+  
+  // 9. Relancer le matching pour les utilisateurs déplacés
+  for(const displaced of displacedUsers){
+    const displacedUser = findUser(displaced.email);
+    if(displacedUser){
+      console.log('🔄 Nouvelle proposition pour utilisateur déplacé:', displaced.email);
+      await notify(displaced.email, "Votre proposition de binôme a été annulée. Une meilleure compatibilité a été trouvée.").catch(e => console.warn('Notification déplacé échouée:', e));
+      await tryAutoMatch(displacedUser).catch(e => console.warn('Re-match échoué:', e));
+    }
+  }
 }
+
 
 function enterApp(){
   document.getElementById('view-site').classList.remove('active');
@@ -1466,6 +1534,82 @@ window.debugAgroMentor = async function(){
   console.log('--- Filleuls ---');
   DB.users.filter(u=>u.role==='filleul').forEach(u=>console.log(`  - ${u.prenom} ${u.nom} (${u.email})`));
   console.log('=== FIN DIAGNOSTIC ===');
+};
+
+/* ============================================================
+   REOPTIMISATION DES BINÔMES PROPOSÉS
+   ============================================================
+   Cette fonction réévalue toutes les propositions "proposé" 
+   existantes pour trouver de meilleurs matchs.
+   À utiliser après une mise à jour du code ou manuellement 
+   depuis la console : reoptimiserBinomes()
+*/
+window.reoptimiserBinomes = async function(){
+  console.log('🔄 === DÉBUT RÉOPTIMISATION DES BINÔMES PROPOSÉS ===');
+  
+  // 1. Collecter tous les utilisateurs ayant un binôme "proposé"
+  const usersToReevaluate = new Set();
+  DB.binomes.filter(b => b.status === 'proposé').forEach(b => {
+    usersToReevaluate.add(b.parrainEmail);
+    usersToReevaluate.add(b.filleulEmail);
+  });
+  
+  console.log('👥 Utilisateurs à réévaluer:', usersToReevaluate.size);
+  usersToReevaluate.forEach(email => {
+    const u = findUser(email);
+    if(u) console.log('   -', u.prenom, u.nom, '(' + u.role + ')');
+  });
+  
+  // 2. Trier par score croissant (les plus faibles d'abord)
+  const proposedBinomes = DB.binomes
+    .filter(b => b.status === 'proposé')
+    .sort((a, b) => (a.compat || 0) - (b.compat || 0));
+  
+  console.log('📊 Binômes proposés à réévaluer:', proposedBinomes.length);
+  proposedBinomes.forEach(b => {
+    const p = findUser(b.parrainEmail);
+    const f = findUser(b.filleulEmail);
+    console.log('   -', (p ? p.prenom + ' ' + p.nom : b.parrainEmail), '↔', (f ? f.prenom + ' ' + f.nom : b.filleulEmail), '|', b.compat + '%');
+  });
+  
+  // 3. Relancer tryAutoMatch pour chaque utilisateur
+  let reoptimized = 0;
+  let unchanged = 0;
+  for(const userEmail of usersToReevaluate){
+    const user = findUser(userEmail);
+    if(!user) continue;
+    
+    const beforeCount = DB.binomes.filter(b => b.status === 'proposé').length;
+    await tryAutoMatch(user).catch(e => console.warn('   ⚠️ Erreur pour', userEmail, ':', e));
+    const afterCount = DB.binomes.filter(b => b.status === 'proposé').length;
+    
+    if(beforeCount !== afterCount || DB.binomes.some(b => b.status === 'proposé' && (b.parrainEmail === userEmail || b.filleulEmail === userEmail))){
+      reoptimized++;
+    } else {
+      unchanged++;
+    }
+  }
+  
+  console.log('📈 Résultats:');
+  console.log('   ✅ Binômes réoptimisés:', reoptimized);
+  console.log('   ⏸️ Binômes inchangés:', unchanged);
+  
+  // 4. Afficher l'état final
+  console.log('\n📋 État final des binômes proposés:');
+  DB.binomes.filter(b => b.status === 'proposé').forEach(b => {
+    const p = findUser(b.parrainEmail);
+    const f = findUser(b.filleulEmail);
+    console.log('   -', (p ? p.prenom + ' ' + p.nom : b.parrainEmail), '↔', (f ? f.prenom + ' ' + f.nom : b.filleulEmail), '|', b.compat + '%');
+  });
+  
+  console.log('\n🔄 === FIN RÉOPTIMISATION ===');
+  toast(reoptimized + ' binôme(s) réoptimisé(s), ' + unchanged + ' inchangé(s)', 'Réoptimisation terminée');
+  
+  // 5. Mettre à jour l'interface si admin connecté
+  const u = me();
+  if(u && u.role === 'admin'){
+    goto('admin-binomes');
+  }
 };
 
 (async function init(){
