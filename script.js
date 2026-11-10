@@ -721,23 +721,37 @@ function getBinomeCompatibility(binome){
 }
 
 async function tryAutoMatch(user){
-  // Vérifier si l'utilisateur a déjà un binôme actif (proposé ou validé)
-  const hasActiveBinome = DB.binomes.some(b => 
+  console.log('🔍 tryAutoMatch pour:', user.email, user.role);
+  
+  // Vérifier si l'utilisateur a un binôme VALIDÉ (seul cas bloquant)
+  const hasValidatedBinome = DB.binomes.some(b => 
     (b.parrainEmail === user.email || b.filleulEmail === user.email) && 
-    (b.status === 'validé' || b.status === 'proposé')
+    b.status === 'validé'
   );
-  if(hasActiveBinome){
-    console.log('⏸️', user.email, 'a déjà un binôme actif, pas de nouveau match');
+  if(hasValidatedBinome){
+    console.log('⏸️', user.email, 'a déjà un binôme validé, pas de nouveau match');
     return;
   }
   
   const oppRole = user.role==='parrain' ? 'filleul' : 'parrain';
-  const candidates = DB.users.filter(candidate=>
-    candidate.role === oppRole &&
-    candidate.status === 'actif' &&
-    !DB.binomes.some(binome=>(binome.parrainEmail===candidate.email || binome.filleulEmail===candidate.email) && binome.status!=='refusé')
-  );
-  if(!candidates.length) return;
+  
+  // Inclure TOUS les candidats actifs du rôle opposé (sauf ceux avec binôme validé)
+  const candidates = DB.users.filter(candidate=>{
+    if(candidate.role !== oppRole || candidate.status !== 'actif') return false;
+    // Exclure seulement les candidats avec un binôme VALIDÉ
+    const hasValidated = DB.binomes.some(b => 
+      (b.parrainEmail === candidate.email || b.filleulEmail === candidate.email) && 
+      b.status === 'validé'
+    );
+    return !hasValidated;
+  });
+  
+  console.log('👥 Candidats trouvés:', candidates.length);
+  
+  if(!candidates.length){
+    console.log('❌ Aucun candidat disponible');
+    return;
+  }
 
   let best = null;
   let bestScore = -1;
