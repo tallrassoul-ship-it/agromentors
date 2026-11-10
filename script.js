@@ -870,12 +870,12 @@ async function logout(){
 }
 function renderSidebar(mode){
   const u=me();
+  // Les utilisateurs ne voient PAS "Mon binôme" - réservé à l'admin
   const userLinks = [
     ['dashboard','01','Vue d\'ensemble'],
     ['profile','02','Mon profil'],
-    ['binome','03','Mon binôme'],
-    ['messages','04','Messagerie'],
-    ['notifications','05','Notifications'],
+    ['messages','03','Messagerie'],
+    ['notifications','04','Notifications'],
   ];
   const nbUsers = DB.users.filter(x=>x.role!=='admin').length;
   const adminLinks = [
@@ -893,7 +893,7 @@ function renderSidebar(mode){
     </div>`;
 }
 const TITLES = {
-  dashboard:"Vue d'ensemble", profile:"Mon profil", binome:"Mon binôme",
+  dashboard:"Vue d'ensemble", profile:"Mon profil", binome:"Gestion des binômes",
   messages:"Messagerie", notifications:"Notifications",
   'admin-overview':"Statistiques de la plateforme", 'admin-users':"Gestion des utilisateurs",
   'admin-binomes':"Gestion des binômes", 'admin-notifications':"Notifications"
@@ -917,7 +917,6 @@ function myBinome(){
 }
 function renderDashboard(){
   const u=me();
-  const b = myBinome();
   const unread = DB.notifications.filter(n=>n.forEmail===u.email && !n.read).length;
   document.getElementById('appContent').innerHTML = `
     <div class="panel profile-card">
@@ -928,12 +927,11 @@ function renderDashboard(){
       </div>
     </div>
     <div class="stat-grid">
-      <div class="stat-box"><b>${b? '1':'0'}</b><span>Binôme actif</span></div>
       <div class="stat-box"><b>${unread}</b><span>Notifications non lues</span></div>
     </div>
     <div class="panel">
-      <h3>Mon binôme</h3>
-      ${binomeSummaryHTML(u)}
+      <h3>Message de l'administrateur</h3>
+      <p style="color:var(--ink-soft);font-size:14px;">L'administrateur vous assignera un binôme compatible selon votre profil. Vous serez notifié dès qu'une proposition sera validée.</p>
     </div>`;
 }
 function binomeSummaryHTML(u){
@@ -963,12 +961,47 @@ function binomeSummaryHTML(u){
 function renderBinomeUser(){
   const u=me();
   if(!u){
-    document.getElementById('appContent').innerHTML = '<div class="panel"><h3>Mon binôme</h3><p>Utilisateur non connecté.</p></div>';
+    document.getElementById('appContent').innerHTML = '<div class="panel"><h3>Binôme</h3><p>Utilisateur non connecté.</p></div>';
     return;
   }
   
-  // Afficher uniquement le binôme actuel (validé ou proposé)
-  const html = `<div class="panel"><h3>Mon binôme</h3>${binomeSummaryHTML(u)}</div>`;
+  // Vérifier si l'utilisateur est admin
+  const isAdmin = u.email === ADMIN_EMAIL || u.role === 'admin';
+  
+  if(!isAdmin){
+    // Les utilisateurs non-admin ne peuvent PAS voir leur binôme
+    document.getElementById('appContent').innerHTML = `
+      <div class="panel">
+        <h3>Binôme</h3>
+        <p style="color:var(--ink-soft);font-size:14px;">La gestion des binômes est réservée à l'administrateur. Vous serez notifié dès qu'un binôme vous sera assigné.</p>
+      </div>`;
+    return;
+  }
+  
+  // Admin : afficher tous les binômes (proposé et validé)
+  const allBinomes = DB.binomes.filter(b => b.status === 'proposé' || b.status === 'validé');
+  
+  let html = '<div class="panel"><h3>Binômes</h3>';
+  if(allBinomes.length === 0){
+    html += '<p style="color:var(--ink-soft);">Aucun binôme dans le système.</p>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+    allBinomes.forEach(b => {
+      const p = findUser(b.parrainEmail);
+      const f = findUser(b.filleulEmail);
+      const badgeClass = b.status === 'validé' ? 'ok' : 'wait';
+      html += `<div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--cream);border-radius:12px;border:1px solid var(--line);">
+        <div class="avatar" style="width:44px;height:44px;font-size:14px;">${initials((p?.prenom||'')+' '+(p?.nom||''))}</div>
+        <div style="flex:1;">
+          <b>${p ? esc(p.prenom)+' '+esc(p.nom) : '—'}</b> ↔ <b>${f ? esc(f.prenom)+' '+esc(f.nom) : '—'}</b>
+          <div style="font-size:11px;color:var(--ink-soft);">${b.compat||0}% compatibilité</div>
+        </div>
+        <span class="badge ${badgeClass}">${b.status}</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  html += '</div>';
   document.getElementById('appContent').innerHTML = html;
 }
 
