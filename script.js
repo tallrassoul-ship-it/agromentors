@@ -1299,6 +1299,19 @@ function renderTopCompatibilities(){
                        existingStatus === 'proposé' ? '<span class="badge wait">Proposé</span>' : 
                        '<span class="badge off">Aucun</span>';
     
+    // Boutons d'action (sauf si déjà validé)
+    let actionButtons = '';
+    if(existingStatus !== 'validé'){
+      actionButtons = `
+        <div style="display:flex;gap:6px;flex-direction:column;">
+          <button class="icon-btn" onclick="validerDepuisTop('${escAttr(match.parrain.email)}','${escAttr(match.filleul.email)}',${match.score})" style="background:var(--cobalt);color:#fff;border:none;">✓ Valider</button>
+          <button class="icon-btn" onclick="refuserDepuisTop('${escAttr(match.parrain.email)}','${escAttr(match.filleul.email)}')">✗ Refuser</button>
+        </div>
+      `;
+    } else {
+      actionButtons = '<div style="color:var(--ink-soft);font-size:11px;">Déjà validé</div>';
+    }
+    
     html += `<div style="display:flex;align-items:center;gap:12px;padding:10px;background:${index < 3 ? 'var(--cobalt-soft)' : 'var(--cream)'};border-radius:8px;border:1px solid var(--line);">
       <div style="font-size:20px;width:30px;">${badge}</div>
       <div style="flex:1;">
@@ -1307,15 +1320,93 @@ function renderTopCompatibilities(){
         <b>${esc(match.filleul.prenom)} ${esc(match.filleul.nom)}</b>
         <div style="font-size:11px;color:var(--ink-soft);">${esc(match.parrain.ville||'')} ↔ ${esc(match.filleul.ville||'')}</div>
       </div>
-      <div style="text-align:right;">
+      <div style="text-align:right;margin-right:12px;">
         <b style="font-size:18px;color:var(--cobalt);">${match.score}%</b>
         <div>${statusBadge}</div>
       </div>
+      ${actionButtons}
     </div>`;
   });
   html += '</div>';
   
   container.innerHTML = html;
+}
+
+// Valider un binôme directement depuis le Top 10
+async function validerDepuisTop(parrainEmail, filleulEmail, score){
+  if(!confirm(`Valider ce binôme avec ${score}% de compatibilité ?`)) return;
+  
+  // Vérifier si un binôme existe déjà entre ces deux utilisateurs
+  let existingBinome = DB.binomes.find(b => 
+    (b.parrainEmail === parrainEmail && b.filleulEmail === filleulEmail) ||
+    (b.parrainEmail === filleulEmail && b.filleulEmail === parrainEmail)
+  );
+  
+  if(existingBinome){
+    // Mettre à jour le statut existant
+    existingBinome.status = 'validé';
+  } else {
+    // Créer un nouveau binôme validé
+    DB.binomes.push({
+      id: uid(),
+      parrainEmail: parrainEmail,
+      filleulEmail: filleulEmail,
+      status: 'validé',
+      compat: score,
+      createdAt: Date.now(),
+      manual: true
+    });
+  }
+  
+  await saveKey('binomes');
+  
+  // Notifier les utilisateurs
+  await notify(parrainEmail, "Votre binôme a été validé par l'administrateur !");
+  await notify(filleulEmail, "Votre binôme a été validé par l'administrateur !");
+  
+  toast("Binôme validé avec succès !");
+  renderAdminBinomes();
+}
+
+// Refuser une proposition depuis le Top 10
+async function refuserDepuisTop(parrainEmail, filleulEmail){
+  if(!confirm("Refuser cette proposition de binôme ?")) return;
+  
+  // Marquer comme refusé si existe, sinon créer une entrée refusée
+  let existingBinome = DB.binomes.find(b => 
+    (b.parrainEmail === parrainEmail && b.filleulEmail === filleulEmail) ||
+    (b.parrainEmail === filleulEmail && b.filleulEmail === parrainEmail)
+  );
+  
+  if(existingBinome){
+    existingBinome.status = 'refusé';
+  } else {
+    DB.binomes.push({
+      id: uid(),
+      parrainEmail: parrainEmail,
+      filleulEmail: filleulEmail,
+      status: 'refusé',
+      compat: 0,
+      createdAt: Date.now(),
+      manual: true
+    });
+  }
+  
+  await saveKey('binomes');
+  
+  // Relancer le matching pour les deux utilisateurs
+  const parrain = findUser(parrainEmail);
+  const filleul = findUser(filleulEmail);
+  
+  if(parrain){
+    await tryAutoMatch(parrain).catch(e => console.warn('Match parrain échoué:', e));
+  }
+  if(filleul){
+    await tryAutoMatch(filleul).catch(e => console.warn('Match filleul échoué:', e));
+  }
+  
+  toast("Proposition refusée. Nouvelles recherches en cours...");
+  renderAdminBinomes();
 }
 function renderBinomeTable(){
   const table = document.getElementById('binomeTable');
