@@ -1257,6 +1257,11 @@ async function modifyBinome(id){
   await withAdminLock(async () => {
     const b=DB.binomes.find(x=>x.id===id);
     if(!b){ toast("Binôme introuvable (peut-être supprimé)."); renderBinomeTable(); return; }
+    
+    // Mémoriser l'ancien filleul
+    const ancienFilleulEmail = b.filleulEmail;
+    const ancienFilleul = findUser(ancienFilleulEmail);
+    
     const candidates = DB.users.filter(u=>u.role==='filleul').map(u=>u.email+' — '+u.prenom+' '+u.nom).join('\n');
     const newFilleul = prompt("Nouvel e-mail du filleul :\n"+candidates, b.filleulEmail);
     if(!newFilleul) return;
@@ -1265,15 +1270,67 @@ async function modifyBinome(id){
       const filleulBusy = DB.binomes.some(x=>x.id!==id && x.filleulEmail===newFilleul && x.status!=='refusé');
       if(filleulBusy){ const f=findUser(newFilleul); toast(`${f?.prenom} ${f?.nom} est déjà dans un autre binôme actif.`); return; }
     }
+    
     b.filleulEmail=newFilleul; b.status='proposé';
-    await saveKey('binomes'); toast("Binôme modifié, en attente de re-validation.");
+    await saveKey('binomes');
+    
+    // Notifier l'ancien filleul et relancer le matching pour lui
+    if(ancienFilleul && ancienFilleulEmail !== newFilleul){
+      await notify(ancienFilleulEmail, "Votre binôme a été modifié par l'administrateur. Une nouvelle proposition vous sera faite.").catch(e => console.warn('Notification ancien filleul échouée:', e));
+      console.log('🔄 Nouvelle proposition pour ancien filleul:', ancienFilleulEmail);
+      await tryAutoMatch(ancienFilleul).catch(e => console.warn('Match ancien filleul échoué:', e));
+    }
+    
+    // Notifier le nouveau filleul
+    const nouveauFilleul = findUser(newFilleul);
+    if(nouveauFilleul){
+      await notify(newFilleul, "Vous avez été assigné(e) à un nouveau binôme par l'administrateur.").catch(e => console.warn('Notification nouveau filleul échouée:', e));
+    }
+    
+    // Notifier le parrain
+    const parrain = findUser(b.parrainEmail);
+    if(parrain){
+      await notify(b.parrainEmail, "Votre binôme a été modifié par l'administrateur.").catch(e => console.warn('Notification parrain échouée:', e));
+    }
+    
+    toast("Binôme modifié, en attente de re-validation.");
     renderBinomeTable();
   });
 }
 async function deleteBinome(id){
   await withAdminLock(async () => {
+    const b = DB.binomes.find(x=>x.id===id);
+    if(!b){ toast("Binôme introuvable."); return; }
+    
+    // Mémoriser les emails avant suppression
+    const parrainEmail = b.parrainEmail;
+    const filleulEmail = b.filleulEmail;
+    const parrain = findUser(parrainEmail);
+    const filleul = findUser(filleulEmail);
+    
+    // Supprimer le binôme
     DB.binomes = DB.binomes.filter(b=>b.id!==id);
-    await saveKey('binomes'); toast("Binôme supprimé.");
+    await saveKey('binomes');
+    
+    // Notifications
+    if(parrain){
+      await notify(parrainEmail, "Votre binôme a été supprimé par l'administrateur. Une nouvelle proposition vous sera faite.");
+    }
+    if(filleul){
+      await notify(filleulEmail, "Votre binôme a été supprimé par l'administrateur. Une nouvelle proposition vous sera faite.");
+    }
+    
+    // Relancer le matching pour les deux membres
+    if(parrain){
+      console.log('🔄 Nouvelle proposition pour parrain:', parrainEmail);
+      await tryAutoMatch(parrain).catch(e => console.warn('Match parrain échoué:', e));
+    }
+    if(filleul){
+      console.log('🔄 Nouvelle proposition pour filleul:', filleulEmail);
+      await tryAutoMatch(filleul).catch(e => console.warn('Match filleul échoué:', e));
+    }
+    
+    toast("Binôme supprimé. Nouvelles propositions en cours...");
     renderBinomeTable();
   });
 }
